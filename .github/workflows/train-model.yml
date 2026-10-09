@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - "ml/**"
+      - "ml/train.py"
+      - "ml/download_datasets.py"
+      - "ml/dataset_config.json"
+      - "ml/requirements.txt"
       - ".github/workflows/train-model.yml"
   workflow_dispatch:
     inputs:
