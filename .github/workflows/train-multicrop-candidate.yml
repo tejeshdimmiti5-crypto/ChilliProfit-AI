@@ -1,0 +1,116 @@
+name: Train multi-crop candidate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ml/train_multicrop.py"
+      - "ml/test_multicrop.py"
+      - ".github/workflows/train-multicrop-candidate.yml"
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: Training epochs (start small for the first candidate)
+        required: false
+        default: "4"
+      batch_size:
+        description: Training batch size
+        required: false
+        default: "32"
+      max_train_per_class:
+        description: Maximum original training rows per class
+        required: false
+        default: "1600"
+      samples_per_class_per_epoch:
+        description: Balanced samples per class per epoch
+        required: false
+        default: "80"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: multicrop-candidate-training
+  cancel-in-progress: false
+
+jobs:
+  train-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/requirements.txt
+
+      - name: Install ML dependencies
+        run: python -m pip install -r ml/requirements.txt
+
+      - name: Test multi-crop label and sampling helpers
+        run: python -m pytest -q ml/test_multicrop.py
+
+      - name: Train isolated multi-crop candidate
+        env:
+          CANDIDATE_EPOCHS: ${{ inputs.epochs || '4' }}
+          CANDIDATE_BATCH_SIZE: ${{ inputs.batch_size || '32' }}
+          CANDIDATE_MAX_PER_CLASS: ${{ inputs.max_train_per_class || '1600' }}
+          CANDIDATE_SAMPLES_PER_CLASS: ${{ inputs.samples_per_class_per_epoch || '80' }}
+        run: |
+          python ml/train_multicrop.py \
+            --epochs "$CANDIDATE_EPOCHS" \
+            --batch-size "$CANDIDATE_BATCH_SIZE" \
+            --max-train-per-class "$CANDIDATE_MAX_PER_CLASS" \
+            --samples-per-class-per-epoch "$CANDIDATE_SAMPLES_PER_CLASS" \
+            --output ml/artifacts/multicrop_model.pt
+
+      - name: Generate candidate integrity manifest
+        run: |
+          sha256sum ml/artifacts/multicrop_model.pt > ml/artifacts/multicrop_model.sha256
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          metrics_path = Path("ml/artifacts/multicrop_model.json")
+          metrics = json.loads(metrics_path.read_text())
+          summary = [
+              "# Multi-crop candidate training",
+              "",
+              f"- Crop species: **{metrics['crop_count']}**",
+              f"- Crop/disease classes: **{metrics['class_count']}**",
+              f"- Training rows: **{metrics['training_rows_after_cap']}** (capped from {metrics['training_rows_before_cap']})",
+              f"- Validation rows: **{metrics['validation_rows']}**",
+              f"- Held-out test rows: **{metrics['test_rows']}**",
+              f"- Best epoch: **{metrics['best_epoch']}**",
+              f"- Test accuracy: **{metrics['test_accuracy']:.4f}**",
+              f"- Test macro-F1: **{metrics['test_macro_f1']:.4f}**",
+              "",
+              "> Candidate only. This workflow does not publish a production release or deploy to Render.",
+              "",
+              "## Crop species",
+              "",
+              ", ".join(metrics["crops"]),
+              "",
+              "## Data sources",
+              "",
+          ]
+          summary.extend(f"- {item['name']} ({item['repo']})" for item in metrics["datasets"])
+          Path(__import__("os").environ["GITHUB_STEP_SUMMARY"]).write_text("\n".join(summary) + "\n")
+          print("Candidate metrics:")
+          print(json.dumps({key: metrics[key] for key in ("crop_count", "class_count", "training_rows_after_cap", "validation_rows", "test_rows", "test_accuracy", "test_macro_f1")}, indent=2))
+          PY
+
+      - name: Upload multi-crop candidate artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: chilliprofit-multicrop-candidate-${{ github.run_number }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            ml/artifacts/multicrop_model.pt
+            ml/artifacts/multicrop_model.json
+            ml/artifacts/multicrop_model.sha256
