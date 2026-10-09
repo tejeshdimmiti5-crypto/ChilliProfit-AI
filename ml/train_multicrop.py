@@ -41,6 +41,7 @@ def slug(value):
     value = re.sub(r"[^a-z0-9]+", "_", value).strip("_")
     aliases = {
         "pepper_bell": "bell_pepper",
+        "corn": "maize",
         "corn_maize": "maize",
     }
     return aliases.get(value, value)
@@ -174,13 +175,13 @@ def evaluate(model, loader, device):
 
 def main():
     parser = argparse.ArgumentParser(description="Train a crop-aware plant disease classifier.")
-    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--patience", type=int, default=3)
     parser.add_argument("--max-train-per-class", type=int, default=1600)
-    parser.add_argument("--samples-per-class-per-epoch", type=int, default=300)
-    parser.add_argument("--output", default="ml/artifacts/chilli_model.pt")
+    parser.add_argument("--samples-per-class-per-epoch", type=int, default=80)
+    parser.add_argument("--output", default="ml/artifacts/multicrop_model.pt")
     args = parser.parse_args()
 
     if args.epochs < 1 or args.batch_size < 1 or args.max_train_per_class < 1 or args.samples_per_class_per_epoch < 1:
