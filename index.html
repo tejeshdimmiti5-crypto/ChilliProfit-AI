@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -16,6 +17,7 @@
     <nav>
       <a href="#analyzer">Disease Scan</a>
       <a href="#farm">Farm</a>
+      <a href="#land-plotter">Plot Land</a>
       <a href="#economics">Economics</a>
     </nav>
     <a class="nav-btn" href="#analyzer">Scan Crop</a>
@@ -109,6 +111,40 @@
       </div>
     </section>
 
+
+    <section class="section land-section" id="land-plotter">
+      <div class="section-heading">
+        <span class="eyebrow">03 • LAND BOUNDARY NAVIGATION</span>
+        <h2>Plot your land, point by point.</h2>
+        <p>Tap the map to mark each corner of your field. ChilliProfit joins the points, closes the boundary, and estimates the land area.</p>
+      </div>
+      <div class="land-layout">
+        <div class="land-map-card">
+          <div class="land-map-toolbar">
+            <div><strong>Field boundary</strong><span id="landPointCount">0 boundary points</span></div>
+            <span class="map-hint">Tap map to add a point</span>
+          </div>
+          <div id="landMap" role="application" aria-label="Interactive map for plotting field boundary"></div>
+          <div class="land-actions">
+            <button class="land-button" id="locateLand" type="button">◎ Use my location</button>
+            <button class="land-button" id="undoLandPoint" type="button">↶ Undo point</button>
+            <button class="land-button danger" id="clearLand" type="button">Clear plot</button>
+          </div>
+          <p class="land-note">For best results, mark each field corner while standing there or use a reliable GPS/survey map. Area is an estimate, not a legal land survey.</p>
+        </div>
+        <aside class="land-summary">
+          <span class="land-summary-label">ESTIMATED FIELD AREA</span>
+          <strong id="landAreaAcres">— <small>acres</small></strong>
+          <div class="land-metric"><span>Hectares</span><b id="landAreaHectares">—</b></div>
+          <div class="land-metric"><span>Boundary points</span><b id="landPointTotal">0</b></div>
+          <div class="land-metric"><span>Perimeter</span><b id="landPerimeter">—</b></div>
+          <button class="land-button land-primary" id="navigateLand" type="button" disabled>Navigate to field centre ↗</button>
+          <button class="land-button" id="exportLand" type="button" disabled>Download boundary (GeoJSON)</button>
+          <p id="landPlotStatus" class="land-plot-status" aria-live="polite">Add at least 3 points to calculate area.</p>
+        </aside>
+      </div>
+    </section>
+
     <section class="section" id="economics">
       <div class="section-heading">
         <span class="eyebrow">03 • FARM ECONOMICS</span>
@@ -134,6 +170,7 @@
   </main>
 
   <footer><span>🌶️ ChilliProfit AI</span><span>AI-powered chilli farming intelligence</span></footer>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
 </body>
