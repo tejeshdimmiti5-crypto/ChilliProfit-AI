@@ -6,7 +6,6 @@ on:
     paths:
       - "ml/train.py"
       - "ml/download_datasets.py"
-      - "ml/requirements.txt"
   workflow_dispatch:
     inputs:
       epochs:
