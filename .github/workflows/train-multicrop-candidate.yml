@@ -51,6 +51,9 @@ jobs:
       - name: Install ML dependencies
         run: python -m pip install -r ml/requirements.txt
 
+      - name: Check dependency consistency
+        run: python -m pip check
+
       - name: Assert candidate checkpoint is isolated from baseline
         run: |
           test "ml/artifacts/multicrop_model.pt" != "ml/artifacts/chilli_model.pt"
