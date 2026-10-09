@@ -28,5 +28,16 @@
       "healthy"
     ],
     "purpose": "external field validation; do not mix into training until labels and duplicates are checked"
+  },
+  "additional_training": {
+    "name": "PlantVillage full",
+    "source": "https://huggingface.co/datasets/geraldmc/plantvillage-full",
+    "revision": "v0.1.0",
+    "license": "CC0 1.0",
+    "mode": "huggingface",
+    "image_count": 54304,
+    "crop_species": 14,
+    "crop_disease_classes": 38,
+    "purpose": "multi-crop candidate training only; preserve published train/test split metadata and validate on field images before deployment"
   }
 }
