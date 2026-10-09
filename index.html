@@ -116,13 +116,13 @@
       <div class="section-heading">
         <span class="eyebrow">03 • LAND BOUNDARY NAVIGATION</span>
         <h2>Plot your land, point by point.</h2>
-        <p>Tap the map to mark each corner of your field. ChilliProfit joins the points, closes the boundary, and estimates the land area.</p>
+        <p>Walk the edge of your field while GPS records your route, or tap the map to place boundary corners manually. ChilliProfit joins the points into your field shape and estimates its area.</p>
       </div>
       <div class="land-layout">
         <div class="land-map-card">
           <div class="land-map-toolbar">
             <div><strong>Field boundary</strong><span id="landPointCount">0 boundary points</span></div>
-            <span class="map-hint">Tap map to add a point</span>
+            <span class="map-hint">Walk with GPS or tap to add points</span>
           </div>
           <div id="landMap" role="application" aria-label="Interactive map for plotting field boundary"></div>
           <div class="land-actions">
@@ -130,7 +130,17 @@
             <button class="land-button" id="undoLandPoint" type="button">↶ Undo point</button>
             <button class="land-button danger" id="clearLand" type="button">Clear plot</button>
           </div>
-          <p class="land-note">For best results, mark each field corner while standing there or use a reliable GPS/survey map. Area is an estimate, not a legal land survey.</p>
+          <div class="walk-boundary-panel">
+            <div class="walk-boundary-heading"><strong>Walk your field boundary</strong><span>Stand at a corner, start GPS, then walk around the edge. Points are recorded as you move.</span></div>
+            <div class="walk-boundary-actions">
+              <button class="land-button land-primary" id="startWalk" type="button">▶ Start walking</button>
+              <button class="land-button" id="pauseWalk" type="button" disabled>Ⅱ Pause</button>
+              <button class="land-button" id="finishWalk" type="button" disabled>✓ Finish &amp; close</button>
+              <button class="land-button" id="markCorner" type="button">＋ Mark current corner</button>
+            </div>
+            <div class="gps-status-row"><span class="gps-indicator"></span><span id="landGpsStatus" aria-live="polite">GPS is off — allow location access to begin.</span></div>
+            <p class="land-note">Tip: mark each sharp corner using “Mark current corner” for a cleaner shape. Keep the screen awake and walk slowly near the boundary. GPS drift can affect area estimates; use a survey for legal measurements.</p>
+          </div>
         </div>
         <aside class="land-summary">
           <span class="land-summary-label">ESTIMATED FIELD AREA</span>

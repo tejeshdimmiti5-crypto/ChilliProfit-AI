@@ -195,7 +195,8 @@ function updateEconomics() {
 updateEconomics();
 
 
-// Interactive land boundary plotter. Coordinates stay in this browser unless exported.
+// Interactive land boundary plotter with manual points and GPS walking mode.
+// Coordinates remain local in the browser unless the user exports them.
 (function initLandPlotter() {
   const mapElement = document.getElementById('landMap');
   if (!mapElement || !window.L) return;
@@ -210,18 +211,33 @@ updateEconomics();
   let markers = [];
   let boundaryLine = null;
   let boundaryPolygon = null;
+  let currentLocationMarker = null;
+  let watchId = null;
+  let trackingActive = false;
+  let boundaryFinalized = false;
+  let currentGpsLocation = null;
+  let currentGpsAccuracy = null;
+  const MIN_POINT_DISTANCE_METERS = 4;
+  const MAX_ACCEPTED_GPS_ACCURACY_METERS = 25;
+
   const pointCount = document.getElementById('landPointCount');
   const pointTotal = document.getElementById('landPointTotal');
   const areaAcres = document.getElementById('landAreaAcres');
   const areaHectares = document.getElementById('landAreaHectares');
   const perimeterEl = document.getElementById('landPerimeter');
   const status = document.getElementById('landPlotStatus');
+  const gpsStatus = document.getElementById('landGpsStatus');
+  const startWalkButton = document.getElementById('startWalk');
+  const pauseWalkButton = document.getElementById('pauseWalk');
+  const finishWalkButton = document.getElementById('finishWalk');
+  const markCornerButton = document.getElementById('markCorner');
   const navigateButton = document.getElementById('navigateLand');
   const exportButton = document.getElementById('exportLand');
 
   function distanceMeters(a, b) {
     return map.distance(L.latLng(a[0], a[1]), L.latLng(b[0], b[1]));
   }
+
   function polygonAreaMeters(pointsList) {
     if (pointsList.length < 3) return 0;
     const radius = 6378137;
@@ -234,14 +250,36 @@ updateEconomics();
     }
     return Math.abs(sum * radius * radius / 2);
   }
+
   function savePoints() {
     try { localStorage.setItem(storageKey, JSON.stringify(points)); } catch (_) {}
   }
+
+  function updateGpsStatus(message, mode = '') {
+    gpsStatus.textContent = message;
+    const dot = gpsStatus.parentElement?.querySelector('.gps-indicator');
+    if (dot) {
+      dot.classList.toggle('is-recording', mode === 'recording');
+      dot.classList.toggle('is-warning', mode === 'warning');
+    }
+  }
+
+  function stopGpsWatch() {
+    if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    trackingActive = false;
+    startWalkButton.disabled = false;
+    startWalkButton.textContent = points.length ? '▶ Resume walking' : '▶ Start walking';
+    pauseWalkButton.disabled = true;
+    finishWalkButton.disabled = points.length === 0;
+  }
+
   function renderPlot() {
     markers.forEach(marker => map.removeLayer(marker));
     markers = [];
     if (boundaryLine) map.removeLayer(boundaryLine);
     if (boundaryPolygon) map.removeLayer(boundaryPolygon);
+
     points.forEach((point, index) => {
       const marker = L.marker(point, {
         icon: L.divIcon({
@@ -253,66 +291,240 @@ updateEconomics();
       }).addTo(map).bindTooltip('Boundary point ' + (index + 1));
       markers.push(marker);
     });
-    if (points.length >= 3) {
-      boundaryPolygon = L.polygon(points, { color: '#1e6b43', weight: 3, fillColor: '#b9df65', fillOpacity: 0.28 }).addTo(map);
+
+    if (points.length >= 3 && boundaryFinalized && !trackingActive) {
+      boundaryPolygon = L.polygon(points, {
+        color: '#1e6b43', weight: 3, fillColor: '#b9df65', fillOpacity: 0.28
+      }).addTo(map);
     } else if (points.length >= 2) {
-      boundaryLine = L.polyline(points, { color: '#1e6b43', weight: 3, dashArray: '7 6' }).addTo(map);
+      boundaryLine = L.polyline(points, {
+        color: trackingActive ? '#2479db' : '#1e6b43',
+        weight: 3,
+        dashArray: trackingActive ? null : '7 6'
+      }).addTo(map);
     }
 
     pointCount.textContent = points.length + (points.length === 1 ? ' boundary point' : ' boundary points');
     pointTotal.textContent = String(points.length);
-    const validPolygon = points.length >= 3;
+    const validPolygon = points.length >= 3 && boundaryFinalized && !trackingActive;
     const area = validPolygon ? polygonAreaMeters(points) : 0;
-    const perimeter = validPolygon ? points.reduce((sum, p, i) => sum + distanceMeters(p, points[(i + 1) % points.length]), 0) : 0;
-    areaAcres.innerHTML = validPolygon ? (area / 4046.8564224).toLocaleString('en-IN', { maximumFractionDigits: 3 }) + ' <small>acres</small>' : '— <small>acres</small>';
-    areaHectares.textContent = validPolygon ? (area / 10000).toLocaleString('en-IN', { maximumFractionDigits: 3 }) : '—';
-    perimeterEl.textContent = validPolygon ? (perimeter >= 1000 ? (perimeter / 1000).toFixed(2) + ' km' : Math.round(perimeter) + ' m') : '—';
+    const perimeter = validPolygon
+      ? points.reduce((sum, p, i) => sum + distanceMeters(p, points[(i + 1) % points.length]), 0)
+      : 0;
+    areaAcres.innerHTML = validPolygon
+      ? (area / 4046.8564224).toLocaleString('en-IN', { maximumFractionDigits: 3 }) + ' <small>acres</small>'
+      : '— <small>acres</small>';
+    areaHectares.textContent = validPolygon
+      ? (area / 10000).toLocaleString('en-IN', { maximumFractionDigits: 3 })
+      : '—';
+    perimeterEl.textContent = validPolygon
+      ? (perimeter >= 1000 ? (perimeter / 1000).toFixed(2) + ' km' : Math.round(perimeter) + ' m')
+      : '—';
     navigateButton.disabled = points.length === 0;
     exportButton.disabled = !validPolygon;
-    status.textContent = points.length < 3 ? 'Add ' + (3 - points.length) + ' more point(s) to close the boundary.' : 'Boundary closed. Area is an estimate; verify with a survey.';
+
+    if (trackingActive) {
+      status.textContent = 'Recording boundary · ' + points.length + ' points captured. Finish & close when you return to the start.';
+    } else if (validPolygon) {
+      status.textContent = 'Boundary closed. Area is an estimate; verify with a land survey.';
+    } else if (points.length < 3) {
+      status.textContent = 'Add ' + (3 - points.length) + ' more point(s) to close the boundary.';
+    } else {
+      status.textContent = 'Ready to close boundary. Tap Finish & close after walking the edge.';
+    }
     savePoints();
   }
-  map.on('click', event => {
-    points.push([Number(event.latlng.lat.toFixed(7)), Number(event.latlng.lng.toFixed(7))]);
-    renderPlot();
-  });
-  document.getElementById('undoLandPoint').addEventListener('click', () => {
-    points.pop();
-    renderPlot();
-  });
-  document.getElementById('clearLand').addEventListener('click', () => {
-    points = [];
-    renderPlot();
-    status.textContent = 'Plot cleared. Tap the map to start a new boundary.';
-  });
-  document.getElementById('locateLand').addEventListener('click', () => {
+
+  function showCurrentLocation(location, accuracy) {
+    currentGpsLocation = location;
+    currentGpsAccuracy = accuracy;
+    if (!currentLocationMarker) {
+      currentLocationMarker = L.circleMarker(location, {
+        radius: 8, color: '#fff', weight: 3, fillColor: '#2479db', fillOpacity: 1
+      }).addTo(map);
+    } else {
+      currentLocationMarker.setLatLng(location);
+    }
+    currentLocationMarker.bindTooltip('Current GPS location · ±' + Math.round(accuracy) + ' m');
+  }
+
+  function acceptLocation(position, forcePoint = false) {
+    const location = [Number(position.coords.latitude.toFixed(7)), Number(position.coords.longitude.toFixed(7))];
+    const accuracy = Number(position.coords.accuracy) || 999;
+    showCurrentLocation(location, accuracy);
+
+    if (accuracy > MAX_ACCEPTED_GPS_ACCURACY_METERS) {
+      updateGpsStatus('GPS accuracy is about ±' + Math.round(accuracy) + ' m. Waiting for a clearer signal before recording.', 'warning');
+      return false;
+    }
+
+    if (points.length === 0) {
+      points.push(location);
+      boundaryFinalized = false;
+      map.setView(location, Math.max(map.getZoom(), 18));
+      updateGpsStatus('Start point recorded · GPS accuracy ±' + Math.round(accuracy) + ' m.', trackingActive ? 'recording' : '');
+      renderPlot();
+      return true;
+    }
+
+    const last = points[points.length - 1];
+    const distance = distanceMeters(last, location);
+    if (forcePoint && distance >= 1.5) {
+      points.push(location);
+      boundaryFinalized = false;
+      updateGpsStatus('Corner marked · GPS accuracy ±' + Math.round(accuracy) + ' m.', trackingActive ? 'recording' : '');
+      renderPlot();
+      return true;
+    }
+    if (distance >= MIN_POINT_DISTANCE_METERS) {
+      points.push(location);
+      boundaryFinalized = false;
+      updateGpsStatus('Boundary point recorded · moved ' + Math.round(distance) + ' m · GPS ±' + Math.round(accuracy) + ' m.', trackingActive ? 'recording' : '');
+      renderPlot();
+      if (!map.getBounds().pad(-0.15).contains(location)) map.panTo(location, { animate: false });
+      return true;
+    }
+    updateGpsStatus('GPS connected · accuracy ±' + Math.round(accuracy) + ' m · waiting for movement.', trackingActive ? 'recording' : '');
+    return false;
+  }
+
+  function onGpsError(error) {
+    const message = error.code === 1
+      ? 'Location permission denied. Allow location access in your browser settings.'
+      : error.code === 3
+        ? 'GPS timed out. Move outdoors and try again.'
+        : 'Could not get GPS. Check location settings and try again.';
+    updateGpsStatus(message, 'warning');
+    if (trackingActive) stopGpsWatch();
+    status.textContent = message;
+  }
+
+  function startGpsWatch() {
     if (!navigator.geolocation) {
-      status.textContent = 'Location is not supported by this browser.';
+      updateGpsStatus('This browser does not support GPS location.', 'warning');
       return;
     }
-    status.textContent = 'Requesting location permission…';
+    if (trackingActive) return;
+    trackingActive = true;
+    boundaryFinalized = false;
+    startWalkButton.disabled = true;
+    startWalkButton.textContent = '● Recording…';
+    pauseWalkButton.disabled = false;
+    finishWalkButton.disabled = false;
+    updateGpsStatus('Requesting GPS… walk slowly around the outer edge of your field.', 'recording');
+    renderPlot();
+    watchId = navigator.geolocation.watchPosition(
+      position => { if (trackingActive) acceptLocation(position, false); },
+      onGpsError,
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+    );
+  }
+
+  map.on('click', event => {
+    if (trackingActive) {
+      status.textContent = 'GPS walking is active. Use “Mark current corner” at corners, or pause to add map points.';
+      return;
+    }
+    points.push([Number(event.latlng.lat.toFixed(7)), Number(event.latlng.lng.toFixed(7))]);
+    boundaryFinalized = points.length >= 3;
+    renderPlot();
+  });
+
+  startWalkButton.addEventListener('click', startGpsWatch);
+
+  pauseWalkButton.addEventListener('click', () => {
+    stopGpsWatch();
+    updateGpsStatus('GPS paused. Resume walking or finish and close the boundary.');
+    renderPlot();
+  });
+
+  finishWalkButton.addEventListener('click', () => {
+    stopGpsWatch();
+    boundaryFinalized = points.length >= 3;
+    renderPlot();
+    if (boundaryFinalized) {
+      status.textContent = 'Boundary closed with ' + points.length + ' points. Review the outline and area before using it.';
+      updateGpsStatus('Boundary finished · ' + points.length + ' points saved on this device.');
+      if (boundaryPolygon) map.fitBounds(boundaryPolygon.getBounds().pad(0.12));
+    } else {
+      status.textContent = 'Need at least 3 good points to close a shape. Resume walking or mark more corners.';
+      updateGpsStatus('Not enough points to close the boundary yet.', 'warning');
+    }
+  });
+
+  markCornerButton.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      updateGpsStatus('This browser does not support GPS location.', 'warning');
+      return;
+    }
+    updateGpsStatus('Getting a fresh GPS fix for this corner…', trackingActive ? 'recording' : '');
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const accepted = acceptLocation(position, true);
+        if (!accepted && (Number(position.coords.accuracy) || 999) > MAX_ACCEPTED_GPS_ACCURACY_METERS) {
+          updateGpsStatus('GPS accuracy is too low to mark this corner. Wait outdoors for a better fix.', 'warning');
+        }
+      },
+      onGpsError,
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    );
+  });
+
+  document.getElementById('undoLandPoint').addEventListener('click', () => {
+    points.pop();
+    boundaryFinalized = false;
+    renderPlot();
+  });
+
+  document.getElementById('clearLand').addEventListener('click', () => {
+    if (watchId !== null && navigator.geolocation) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    trackingActive = false;
+    points = [];
+    boundaryFinalized = false;
+    startWalkButton.disabled = false;
+    startWalkButton.textContent = '▶ Start walking';
+    pauseWalkButton.disabled = true;
+    finishWalkButton.disabled = true;
+    renderPlot();
+    updateGpsStatus('Plot cleared. Stand at a corner and start walking again.');
+    status.textContent = 'Plot cleared. Tap the map or start GPS walking to create a new boundary.';
+  });
+
+  document.getElementById('locateLand').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      updateGpsStatus('This browser does not support GPS location.', 'warning');
+      return;
+    }
+    updateGpsStatus('Requesting location permission…');
     navigator.geolocation.getCurrentPosition(position => {
       const location = [position.coords.latitude, position.coords.longitude];
+      const accuracy = Number(position.coords.accuracy) || 999;
+      showCurrentLocation(location, accuracy);
       map.setView(location, 19);
-      L.circleMarker(location, { radius: 8, color: '#fff', weight: 3, fillColor: '#2479db', fillOpacity: 1 }).addTo(map)
-        .bindPopup('Your current location').openPopup();
-      status.textContent = 'Map centred on your location. Tap each field corner to plot the boundary.';
-    }, error => {
-      status.textContent = error.code === 1 ? 'Location permission was denied. You can still tap the map manually.' : 'Could not get GPS location. Try again or tap the map manually.';
-    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 });
+      updateGpsStatus('Map centred on your location · GPS accuracy ±' + Math.round(accuracy) + ' m.');
+      if (currentLocationMarker) currentLocationMarker.openTooltip();
+    }, onGpsError, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 });
   });
+
   navigateButton.addEventListener('click', () => {
     if (!points.length) return;
     const lat = points.reduce((sum, p) => sum + p[0], 0) / points.length;
     const lng = points.reduce((sum, p) => sum + p[1], 0) / points.length;
     window.open('https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(lat + ',' + lng), '_blank', 'noopener');
   });
+
   exportButton.addEventListener('click', () => {
-    if (points.length < 3) return;
+    if (points.length < 3 || !boundaryFinalized) return;
     const closed = [...points, points[0]].map(([lat, lng]) => [lng, lat]);
     const feature = {
       type: 'Feature',
-      properties: { name: 'ChilliProfit field boundary', area_acres: Number((polygonAreaMeters(points) / 4046.8564224).toFixed(4)), note: 'Approximate boundary; not a legal survey.' },
+      properties: {
+        name: 'ChilliProfit field boundary',
+        area_acres: Number((polygonAreaMeters(points) / 4046.8564224).toFixed(4)),
+        perimeter_meters: Number(points.reduce((sum, p, i) => sum + distanceMeters(p, points[(i + 1) % points.length]), 0).toFixed(2)),
+        note: 'Approximate GPS boundary; not a legal survey.'
+      },
       geometry: { type: 'Polygon', coordinates: [closed] }
     };
     const blob = new Blob([JSON.stringify({ type: 'FeatureCollection', features: [feature] }, null, 2)], { type: 'application/geo+json' });
@@ -323,10 +535,14 @@ updateEconomics();
     link.click();
     URL.revokeObjectURL(url);
   });
+
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
     if (Array.isArray(saved)) points = saved.filter(p => Array.isArray(p) && p.length === 2 && p.every(Number.isFinite));
   } catch (_) {}
+  boundaryFinalized = points.length >= 3;
+  finishWalkButton.disabled = points.length === 0;
+  startWalkButton.textContent = points.length ? '▶ Resume walking' : '▶ Start walking';
   renderPlot();
   window.setTimeout(() => map.invalidateSize(), 250);
 })();

@@ -28,3 +28,17 @@
 .land-point-icon span{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:2px solid white;border-radius:50%;background:var(--green);color:#fff;font-weight:800;box-shadow:0 2px 8px #0003}
 @media(max-width:850px){.land-layout{grid-template-columns:1fr}#landMap{height:360px}}
 @media(max-width:520px){.land-map-toolbar{align-items:flex-start;flex-direction:column}.land-map-toolbar .map-hint{white-space:normal}#landMap{height:320px}.land-actions .land-button{flex:1 1 42%}.land-summary{padding:20px}}
+
+
+/* GPS walking boundary recorder */
+.walk-boundary-panel{padding:16px 20px 18px;border-top:1px solid var(--line);background:#f8faf5}
+.walk-boundary-heading strong{display:block;font-family:'Space Grotesk';font-size:15px}
+.walk-boundary-heading span{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.walk-boundary-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.walk-boundary-actions .land-button{flex:1 1 145px;min-height:42px}
+.gps-status-row{display:flex;align-items:flex-start;gap:9px;margin-top:14px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:11px;color:var(--muted)}
+.gps-indicator{flex:0 0 9px;height:9px;border-radius:50%;background:#9aa69c;margin-top:3px}
+.gps-indicator.is-recording{background:#2479db;box-shadow:0 0 0 4px #2479db20;animation:gpsPulse 1.5s infinite}
+.gps-indicator.is-warning{background:#d89a20}
+@keyframes gpsPulse{50%{box-shadow:0 0 0 7px #2479db10}}
+@media(max-width:520px){.walk-boundary-panel{padding:14px}.walk-boundary-actions .land-button{flex:1 1 100%}}
