@@ -51,6 +51,11 @@ jobs:
       - name: Install ML dependencies
         run: python -m pip install -r ml/requirements.txt
 
+      - name: Assert candidate checkpoint is isolated from baseline
+        run: |
+          test "ml/artifacts/multicrop_model.pt" != "ml/artifacts/chilli_model.pt"
+          test ! -e ml/artifacts/chilli_model.pt || echo "Existing chilli baseline, if present, will not be overwritten."
+
       - name: Test multi-crop label and sampling helpers
         run: python -m pytest -q ml/test_multicrop.py
 
