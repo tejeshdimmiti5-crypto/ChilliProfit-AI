@@ -6,6 +6,20 @@ ChilliProfit AI is a smart-farming platform designed to help chilli growers moni
 
 The platform is **not limited to a fixed farm size**. Farm zones, crop observations and economic inputs are designed to scale according to the user's actual farm.
 
+## 🚧 Multi-crop expansion — in progress
+
+> **Current production model:** chilli only. The multi-crop model is experimental and is **not deployed**.
+
+We're extending the project from chilli disease screening toward crop-aware screening for **up to 15 crop species** by combining the current COLD chilli dataset with PlantVillage. The candidate training pipeline and automated checks are being tested before the model can be considered ready.
+
+- **Current baseline:** 532 original chilli images, 5 classes; the deployed release remains `model-1`.
+- **Candidate data sources:** [COLD chilli dataset](https://huggingface.co/datasets/Project-AgML/COLD_chili_leaf_disease_classification) + [PlantVillage full](https://huggingface.co/datasets/geraldmc/plantvillage-full).
+- **Candidate code:** [multi-crop trainer](ml/train_multicrop.py) · [candidate workflow](.github/workflows/train-multicrop-candidate.yml) · [helper tests](ml/test_multicrop.py).
+- **Training status:** [View candidate training run](https://github.com/tejeshdimmiti5-crypto/ChilliProfit-AI/actions/runs/37916709327). Final metrics/artifacts are not yet confirmed.
+- **Before deployment:** review per-class held-out metrics and test on independent, real field photos. Rice is not included in this first candidate.
+
+This expansion does not change the live API or replace the chilli checkpoint. Candidate artifacts are saved separately for review.
+
 ## Current architecture
 
 ```text
