@@ -71,6 +71,18 @@ Model artifacts are published in the `model-1` GitHub Release:
 
 The Krishna River Basin chilli dataset is kept as an external validation source and is not silently mixed into training.
 
+### Multi-crop candidate (experimental, not deployed)
+
+The next training pipeline combines the 532-image COLD chilli dataset with the public [PlantVillage full dataset](https://huggingface.co/datasets/geraldmc/plantvillage-full), which has 54,304 images across 14 plant species and 38 crop-specific health/disease classes. With the separate chilli classes, the candidate is expected to cover up to 15 crop species and 43 crop-specific classes. Rice is not included in this first source and would need a separate, compatible dataset.
+
+- Candidate trainer: `ml/train_multicrop.py`
+- Candidate training workflow: `.github/workflows/train-multicrop-candidate.yml`
+- Candidate artifacts use `multicrop_model.*`; they do **not** overwrite the deployed `chilli_model.pt`.
+- The workflow uploads metrics and the candidate checkpoint for review; it does not create a production release or deploy to Render.
+- PlantVillage images were photographed against relatively plain backgrounds under controlled conditions. Good benchmark metrics are not proof of performance on real farm photos.
+
+The deployed API remains pinned to `model-1` until a multi-crop candidate passes automated checks, per-class review and real-world validation.
+
 ## Technology stack
 
 - Frontend: HTML, CSS, JavaScript
