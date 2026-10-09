@@ -31,6 +31,9 @@ jobs:
       - name: Compile Python source
         run: python -m compileall backend ml
 
+      - name: Test multi-crop training helpers
+        run: python -m pytest -q ml/test_multicrop.py
+
       - name: Verify FastAPI app imports
         run: python -c "from backend.main import app; print(app.title)"
 
