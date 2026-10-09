@@ -41,4 +41,6 @@ jobs:
         run: python -m backend.fetch_model
 
       - name: Run API smoke tests
-        run: pytest -q backend/test_main.py
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q backend/test_main.py
